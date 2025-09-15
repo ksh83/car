@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>디지털 소방차량 아카이브 (업데이트 프로토타입)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif; }
+    .icon-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:0.75rem; padding:1rem; border:1px solid #e5e7eb; cursor:pointer; }
+    .icon-btn:hover { background:#f8fafc; }
+    .dropzone { border:2px dashed #cbd5e1; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+  <!-- 비밀번호 게이트 -->
+  <div id="gate" class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-red-100 via-white to-blue-100">
+    <div class="rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8 border bg-white">
+      <h1 class="text-2xl font-bold mb-2">디지털 소방차량 아카이브</h1>
+      <p class="text-sm mb-6">아이디 없이 비밀번호만으로 접근합니다. (기본 비밀번호: <span class="font-mono">119rescue</span>)</p>
+      <input id="pw" type="password" class="w-full rounded-xl border px-4 py-3" placeholder="비밀번호를 입력" />
+      <button id="enterBtn" class="mt-4 w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3">입장</button>
+      <p id="pwMsg" class="mt-3 text-sm text-red-600 hidden">비밀번호가 올바르지 않습니다.</p>
+    </div>
+  </div>
+
+  <!-- 헤더 -->
+  <header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+      <h2 class="text-lg md:text-2xl font-bold flex items-center gap-2">🚒 디지털 차량 아카이브</h2>
+      <div class="ms-auto flex items-center gap-2 w-full md:w-auto">
+        <input id="searchInput" type="text" class="w-full md:w-80 rounded-xl border px-4 py-2" placeholder="#해시태그(복수 가능) 예: #펌프 #점검" />
+        <button id="searchBtn" class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2">검색</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 -->
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-8">
+
+    <!-- 카테고리 아이콘 -->
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="icon-btn" onclick="scrollToCat('물탱크차')">🚛<span>물탱크차</span></div>
+      <div class="icon-btn" onclick="scrollToCat('중형펌프차')">🚒<span>중형펌프차</span></div>
+      <div class="icon-btn" onclick="scrollToCat('소형펌프차')">🚐<span>소형펌프차</span></div>
+      <div class="icon-btn" onclick="scrollToCat('구급차')">🚑<span>구급차</span></div>
+      <div class="icon-btn" onclick="scrollToCat('굴절 및 사다리차')">🪜<span>굴절/사다리차</span></div>
+    </section>
+
+    <!-- 자료 등록 -->
+    <section class="rounded-2xl bg-white border p-4">
+      <h3 class="text-xl font-bold mb-3">자료 등록</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <input id="fTitle" placeholder="제목" class="rounded-xl border px-3 py-2" />
+        <select id="fCategory" class="rounded-xl border px-3 py-2">
+          <option>물탱크차</option>
+          <option>중형펌프차</option>
+          <option>소형펌프차</option>
+          <option>구급차</option>
+          <option>굴절 및 사다리차</option>
+        </select>
+        <textarea id="fText" rows="3" class="md:col-span-2 rounded-xl border px-3 py-2" placeholder="내용(선택)"></textarea>
+        <input id="fTags" placeholder="#태그,쉼표구분  예: #펌프,#점검" class="md:col-span-2 rounded-xl border px-3 py-2" />
+        <div class="md:col-span-2">
+          <label class="block text-sm mb-1">이미지 (선택)</label>
+          <div id="dropZone" class="dropzone rounded-xl p-4 text-sm text-gray-500 text-center cursor-pointer bg-white">
+            이미지를 드래그하거나 클릭하여 선택
+          </div>
+          <input id="fImage" type="file" accept="image/*" class="hidden" />
+          <img id="imgPreview" class="mt-2 max-h-52 rounded-lg hidden" />
+        </div>
+        <button id="btnAdd" class="md:col-span-2 rounded-xl bg-green-600 text-white py-2">등록</button>
+      </div>
+    </section>
+
+    <!-- 아카이브 -->
+    <section id="categories" class="space-y-10"></section>
+  </main>
+
+  <script>
+    // 게이트
+    document.getElementById('enterBtn').onclick = function(){
+      const val = document.getElementById('pw').value;
+      if(val === '119rescue'){ document.getElementById('gate').classList.add('hidden'); }
+      else { document.getElementById('pwMsg').classList.remove('hidden'); }
+    };
+
+    const CATEGORIES = ['물탱크차','중형펌프차','소형펌프차','구급차','굴절 및 사다리차'];
+    const categoriesRoot = document.getElementById('categories');
+    let items = [
+      {id:1, title:'펌프 점검 체크리스트', category:'중형펌프차', text:'펌프 가동 전 오일, 냉각수, 압력 확인 절차.', tags:['펌프','점검']},
+      {id:2, title:'구급차 산소통 교체', category:'구급차', text:'산소통 교체 단계별 절차 및 주의사항.', tags:['산소','구급차']},
+      {id:3, title:'사다리차 안전벨트 사용법', category:'굴절 및 사다리차', text:'작업 전 반드시 착용해야 하는 안전벨트 사용법.', tags:['안전','벨트']}
+    ];
+
+    // 렌더링
+    function renderAll(){
+      categoriesRoot.innerHTML = '';
+      CATEGORIES.forEach(function(cat){
+        const sec = document.createElement('div');
+        sec.id = 'cat-'+cat;
+        sec.innerHTML = "<h3 class='text-xl font-bold mb-3'>"+cat+"</h3>";
+        const list = document.createElement('div');
+        list.className = 'grid gap-3';
+        items.filter(function(x){ return x.category===cat; }).forEach(function(it){
+          const card = document.createElement('div');
+          card.className = 'rounded-xl border p-3 bg-white';
+          card.id = 'item-'+it.id;
+          card.innerHTML = "<h4 class='font-semibold'>"+it.title+"</h4>"
+                          + (it.url ? "<img class='mt-2 rounded-md max-h-52' src='"+it.url+"' alt='"+it.title+"'/>" : "")
+                          + "<p class='text-sm'>"+(it.text||"")+"</p>"
+                          + "<div class='text-xs text-gray-500'>#"+(it.tags||[]).join(' #')+"</div>";
+          list.appendChild(card);
+        });
+        if(list.children.length===0){
+          list.innerHTML = '<p class="text-sm text-gray-500">등록된 자료가 없습니다.</p>';
+        }
+        sec.appendChild(list);
+        categoriesRoot.appendChild(sec);
+      });
+    }
+    renderAll();
+
+    // 등록
+    window._droppedImageDataURL = '';
+    const dropZone = document.getElementById('dropZone');
+    const fImage = document.getElementById('fImage');
+    const imgPreview = document.getElementById('imgPreview');
+
+    dropZone.addEventListener('click', function(){ fImage.click(); });
+    ['dragenter','dragover'].forEach(function(ev){
+      dropZone.addEventListener(ev, function(e){ e.preventDefault(); dropZone.classList.add('bg-gray-50'); });
+    });
+    ['dragleave','drop'].forEach(function(ev){
+      dropZone.addEventListener(ev, function(e){ e.preventDefault(); dropZone.classList.remove('bg-gray-50'); });
+    });
+    dropZone.addEventListener('drop', function(e){
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(file) handleImage(file);
+    });
+    fImage.addEventListener('change', function(e){
+      const file = e.target.files && e.target.files[0];
+      if(file) handleImage(file);
+    });
+
+    function handleImage(file){
+      if(!file.type.startsWith('image/')){ alert('이미지 파일을 올려주세요.'); return; }
+      const reader = new FileReader();
+      reader.onload = function(){
+        window._droppedImageDataURL = reader.result;
+        imgPreview.src = reader.result;
+        imgPreview.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    document.getElementById('btnAdd').onclick = function(){
+      const title = document.getElementById('fTitle').value.trim();
+      const category = document.getElementById('fCategory').value;
+      const text = document.getElementById('fText').value.trim();
+      const tags = document.getElementById('fTags').value.split(',').map(function(t){ return t.replace('#','').trim();}).filter(Boolean);
+      if(!title){ alert('제목 입력'); return; }
+      const url = window._droppedImageDataURL || '';
+      items.push({id:Date.now(), title, category, text, tags, url});
+      renderAll();
+      // reset form preview
+      window._droppedImageDataURL = '';
+      imgPreview.classList.add('hidden'); imgPreview.src='';
+      fImage.value='';
+      document.getElementById('fTitle').value='';
+      document.getElementById('fText').value='';
+      document.getElementById('fTags').value='';
+    };
+
+    // 카테고리 이동
+    function scrollToCat(cat){
+      const el = document.getElementById('cat-'+cat);
+      if(el) el.scrollIntoView({behavior:'smooth'});
+    }
+    window.scrollToCat = scrollToCat; // expose for onclick
+
+    // 해시태그 검색 → 해당 카드 위치로 이동 & 하이라이트
+    document.getElementById('searchBtn').onclick = function(){
+      const raw = document.getElementById('searchInput').value.trim();
+      if(!raw){ alert('해시태그를 입력하세요. 예: #펌프'); return; }
+      const tokens = raw.replace(/#/g,'').split(/\\s+/).filter(Boolean);
+      const item = items.find(function(x){ return tokens.every(function(t){ return (x.tags||[]).includes(t); }); });
+      if(item){
+        scrollToCat(item.category);
+        setTimeout(function(){
+          const el = document.getElementById('item-'+item.id);
+          if(el){ el.scrollIntoView({behavior:'smooth', block:'center'}); el.classList.add('ring','ring-blue-400'); setTimeout(function(){ el.classList.remove('ring','ring-blue-400'); }, 1500); }
+        }, 300);
+      } else {
+        alert('일치하는 자료가 없습니다.');
+      }
+    };
+  </script>
+</body>
+</html>
